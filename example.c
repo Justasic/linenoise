@@ -1,50 +1,66 @@
+#include "linenoise.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "linenoise.h"
+#include <unistd.h>
 
+LinenoiseState *ls = NULL;
 
-void completion(const char *buf, LinenoiseCompletions *lc) 
+void completion(const char *buf, LinenoiseCompletions *lc)
 {
-	if (buf[0] == 'h') 
+	if (!strcasecmp(buf, "hello"))
 	{
-		LinenoiseAddCompletion(lc,"hello");
-		LinenoiseAddCompletion(lc,"hello there");
+		LinenoiseAddCompletion(lc, "hello World");
+		return;
+	}
+
+	if (buf[0] == 'h')
+	{
+		LinenoiseAddCompletion(lc, "hello");
 	}
 }
 
-char *hints(const char *buf, int *color, int *bold) 
+char *hints(const char *buf, int *color, int *bold)
 {
-	if (!strcasecmp(buf,"hello")) 
+	if (!strcasecmp(buf, "hello"))
 	{
 		*color = 35;
-		*bold = 0;
+		*bold  = 0;
 		return " World";
 	}
 	return NULL;
 }
 
-int main(int argc, char **argv) 
+void AtExit(void)
+{
+	LinenoiseRestore(ls);
+	LinenoiseFreeState(ls);
+}
+
+int main(int argc, char **argv)
 {
 	char *line;
 	char *prgname = argv[0];
 
+	ls = LinenoiseCreate(STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, "> ");
+	atexit(AtExit);
+
 	/* Parse options, with --multiline we enable multi line editing. */
-	while(argc > 1)
+	while (argc > 1)
 	{
 		argc--;
 		argv++;
-		if (!strcmp(*argv,"--multiline"))
+		if (!strcmp(*argv, "--multiline"))
 		{
-			LinenoiseSetMultiLine(1);
+			LinenoiseSetMultiLine(ls, true);
 			printf("Multi-line mode enabled.\n");
-		} 
-		else if (!strcmp(*argv,"--keycodes")) 
+		}
+		else if (!strcmp(*argv, "--keycodes"))
 		{
-			LinenoisePrintKeyCodes();
+			LinenoisePrintKeyCodes(ls);
 			exit(0);
-		} 
-		else 
+		}
+		else
 		{
 			fprintf(stderr, "Usage: %s [--multiline] [--keycodes]\n", prgname);
 			exit(1);
@@ -58,7 +74,7 @@ int main(int argc, char **argv)
 
 	/* Load history from file. The history file is just a plain text file
 	 * where entries are separated by newlines. */
-	LinenoiseHistoryLoad("history.txt"); /* Load the history at startup */
+	LinenoiseHistoryLoad(ls, "history.txt"); /* Load the history at startup */
 
 	/* Now this is the main loop of the typical linenoise-based application.
 	 * The call to linenoise() will block as long as the user types something
@@ -66,25 +82,31 @@ int main(int argc, char **argv)
 	 *
 	 * The typed string is returned as a malloc() allocated string by
 	 * linenoise, so the user needs to free() it. */
-	while((line = linenoise("hello> ")) != NULL) 
+	while ((line = Linenoise(ls)) != NULL)
 	{
 		/* Do something with the string. */
-		if (line[0] != '\0' && line[0] != '/') 
+		if (line[0] != '\0' && line[0] != '/')
 		{
 			printf("echo: '%s'\n", line);
-			LinenoiseHistoryAdd(line); /* Add to the history. */
-			LinenoiseHistorySave("history.txt"); /* Save the history on disk. */
-		} 
-		else if (!strncmp(line,"/historylen",11)) 
+			LinenoiseHistoryAdd(ls, line);			 /* Add to the history. */
+			LinenoiseHistorySave(ls, "history.txt"); /* Save the history on disk. */
+		}
+		else if (!strncmp(line, "/exit", 5))
+			break;
+		else if (!strncmp(line, "/historylen", 11))
 		{
 			/* The "/historylen" command will change the history len. */
-			int len = atoi(line+11);
-			LinenoiseHistorySetMaxLen(len);
-		} 
-		else if (line[0] == '/') 
+			int len = atoi(line + 11);
+			LinenoiseHistorySetMaxLen(ls, len);
+		}
+		else if (line[0] == '/')
 			printf("Unreconized command: %s\n", line);
-			
+
 		free(line);
+		LinenoiseClearBuffer(ls);
 	}
+
+	LinenoiseRestore(ls);
+
 	return 0;
 }

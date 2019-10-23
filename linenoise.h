@@ -36,38 +36,71 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __LINENOISE_H
-#define __LINENOISE_H
+#pragma once
+#include <stdbool.h>
+#include <stdio.h>
+#include <termios.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef struct LinenoiseCompletions {
+	typedef struct LinenoiseCompletions
+	{
 		size_t len;
 		char **cvec;
-} LinenoiseCompletions;
+	} LinenoiseCompletions;
 
-typedef void(LinenoiseCompletionCallback)(const char *, LinenoiseCompletions *);
-typedef char*(LinenoiseHintsCallback)(const char *, int *color, int *bold);
-typedef void(LinenoiseFreeHintsCallback)(void *);
-void LinenoiseSetCompletionCallback(LinenoiseCompletionCallback *);
-void LinenoiseSetHintsCallback(LinenoiseHintsCallback *);
-void LinenoiseSetFreeHintsCallback(LinenoiseFreeHintsCallback *);
-void LinenoiseAddCompletion(LinenoiseCompletions *, const char *);
+	/* The linenoiseState structure represents the state during line editing.
+	 * We pass this state to functions implementing specific editing
+	 * functionalities. */
+	typedef struct LinenoiseState
+	{
+		int			   ifd;				/* Terminal stdin file descriptor. */
+		int			   ofd;				/* Terminal stdout file descriptor. */
+		int			   efd;				/* Terminal stderr file descriptor.  */
+		char *		   buf;				/* Edited line buffer. */
+		size_t		   buflen;			/* Edited line buffer size. */
+		const char *   prompt;			/* Prompt to display. */
+		size_t		   plen;			/* Prompt length. */
+		size_t		   pos;				/* Current cursor position. */
+		size_t		   oldpos;			/* Previous refresh cursor position. */
+		size_t		   len;				/* Current edited line length. */
+		size_t		   cols;			/* Number of columns in terminal. */
+		size_t		   maxrows;			/* Maximum num of rows used so far (multiline mode) */
+		int			   history_index;	/* The history index we are currently editing. */
+		struct termios orig_termios;	/* In order to restore at exit.*/
+		bool		   rawmode;			/* For atexit() function to check if restore is needed, false by default. */
+		bool		   mlmode;			/* Multi line mode. Default is single line. */
+		bool		   nonblock;		/* Non-blocking mode. Default is blocking. */
+		int			   history_max_len; /* Maximum length of the history */
+		int			   history_len;		/* Current length of the history */
+		char **		   history;			/* The history */
+	} LinenoiseState;
 
-char *linenoise(const char *prompt);
-void LinenoiseFree(void *ptr);
-int LinenoiseHistoryAdd(const char *line);
-int LinenoiseHistorySetMaxLen(int len);
-int LinenoiseHistorySave(const char *filename);
-int LinenoiseHistoryLoad(const char *filename);
-void LinenoiseClearScreen(void);
-void LinenoiseSetMultiLine(int ml);
-void LinenoisePrintKeyCodes(void);
+	typedef void(LinenoiseCompletionCallback)(const char *, LinenoiseCompletions *);
+	typedef char *(LinenoiseHintsCallback)(const char *, int *color, int *bold);
+	typedef void(LinenoiseFreeHintsCallback)(void *);
+	void LinenoiseSetCompletionCallback(LinenoiseCompletionCallback *);
+	void LinenoiseSetHintsCallback(LinenoiseHintsCallback *);
+	void LinenoiseSetFreeHintsCallback(LinenoiseFreeHintsCallback *);
+	void LinenoiseAddCompletion(LinenoiseCompletions *, const char *);
+
+	char *			Linenoise(LinenoiseState *ls);
+	void			LinenoiseClearBuffer(LinenoiseState *ls);
+	void			LinenoiseFree(void *ptr);
+	void			LinenoiseFreeState(LinenoiseState *ls);
+	void			LinenoiseRestore(LinenoiseState *ls);
+	int				LinenoiseHistoryAdd(LinenoiseState *ls, const char *line);
+	int				LinenoiseHistorySetMaxLen(LinenoiseState *ls, int len);
+	int				LinenoiseHistorySave(const LinenoiseState *ls, const char *filename);
+	int				LinenoiseHistoryLoad(LinenoiseState *ls, const char *filename);
+	void			LinenoiseClearScreen(const LinenoiseState *ls);
+	void			LinenoiseSetMultiLine(LinenoiseState *ls, int ml);
+	void			LinenoisePrintKeyCodes(LinenoiseState *ls);
+	LinenoiseState *LinenoiseCreate(int ls_stdin, int ls_stdout, int ls_stderr, const char *prompt);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __LINENOISE_H */
